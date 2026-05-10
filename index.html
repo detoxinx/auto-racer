@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>auto racer</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- СТАРТОВЫЙ ЭКРАН -->
+    <div id="start-screen">
+        <h1 class="neon-title">auto racer</h1>
+        <p class="subtitle">специально для тебя</p>
+
+        <div class="car-select">
+            <h2>выбери машинку</h2>
+            <div id="cars-grid"></div>
+        </div>
+
+        <div class="menu-buttons">
+            <button id="start-btn" class="neon-btn">СТАРТ</button>
+            <button id="shop-btn" class="neon-btn shop-btn">МАГАЗИН</button>
+        </div>
+    </div>
+
+    <!-- МАГАЗИН -->
+    <div id="shop-screen">
+        <h2 class="neon-title shop-title">МАГАЗИН</h2>
+        <p id="shop-coins" class="shop-coins">🪙 0</p>
+        <div id="shop-items"></div>
+        <button id="shop-back-btn" class="neon-btn">← НАЗАД</button>
+    </div>
+
+    <!-- ИГРА -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- КНОПКА ПАУЗЫ -->
+    <button id="pause-btn">⏸</button>
+
+    <!-- ИНТЕРФЕЙС -->
+    <div id="hud">
+        <div id="score-display">🪙 0</div>
+        <div id="speed-display">🏎️ 0 km</div>
+        <div id="lives-display">❤️❤️❤️</div>
+        <div id="distance-display">📏 0 m</div>
+        <div id="nitro-bar"><div id="nitro-fill"></div></div>
+        <div id="nitro-label">⚡ NITRO (тапни 2 раза)</div>
+    </div>
+
+    <!-- ПАУЗА -->
+    <div id="pause-screen">
+        <h2 class="neon-title">⏸ ПАУЗА</h2>
+        <p class="pause-tip">отдохни немного</p>
+        <button id="resume-btn" class="neon-btn">▶ ПРОДОЛЖИТЬ</button>
+        <button id="quit-btn" class="neon-btn quit-btn">В МЕНЮ</button>
+    </div>
+
+    <!-- GAME OVER -->
+    <div id="gameover-screen">
+        <h2 class="neon-title">GAME OVER</h2>
+        <p id="final-score"></p>
+        <p id="final-distance"></p>
+        <p id="coins-earned"></p>
+        <p id="easter-msg"></p>
+        <button id="restart-btn" class="neon-btn">ЕЩЁ РАЗ</button>
+        <button id="menu-btn" class="neon-btn quit-btn">В МЕНЮ</button>
+    </div>
+
+    <script src="js/game.js"></script>
+</body>
+</html>
