@@ -444,3 +444,53 @@ body {
     font-size: 1.25em !important;
     margin-top: 15px !important;
 }
+
+/* КНОПКИ ПРЕДМЕТОВ ВО ВРЕМЯ ИГРЫ */
+#item-buttons {
+    position: fixed;
+    bottom: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    z-index: 120;
+    pointer-events: all;
+}
+
+.item-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    font-size: 1.6em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.item-btn:active {
+    background: rgba(0, 255, 255, 0.3);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.5);
+}
+
+.item-btn span {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ff4466;
+    color: white;
+    font-size: 0.4em;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
