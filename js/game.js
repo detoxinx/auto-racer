@@ -48,23 +48,26 @@ const SHOP_ITEMS = [
     {
         id: "shield",
         name: "щит",
-        desc: "начинай с 3 сек неуязвимости",
+        desc: "активируй во время гонки (кнопка на экране)",
         price: 2000,
         icon: "🛡️",
+        type: "active",
     },
     {
         id: "magnet",
         name: "магнит",
-        desc: "монеты притягиваются к тебе",
+        desc: "монеты притягиваются 15 сек",
         price: 3500,
         icon: "🧲",
+        type: "active",
     },
     {
         id: "extralife",
         name: "доп. жизнь",
-        desc: "начинай с 4 жизнями",
+        desc: "+1 жизнь в начале заезда",
         price: 3000,
         icon: "💖",
+        type: "auto",
     },
     {
         id: "nitrostart",
@@ -72,20 +75,23 @@ const SHOP_ITEMS = [
         desc: "начинай с полным нитро",
         price: 2500,
         icon: "🚀",
+        type: "auto",
     },
     {
         id: "doublecoins",
         name: "x2 монеты",
-        desc: "удвоение монет за заезд",
+        desc: "удвоение монет за весь заезд",
         price: 5000,
         icon: "💰",
+        type: "auto",
     },
     {
         id: "slowtraffic",
         name: "медленный трафик",
-        desc: "встречные машины едут медленнее",
+        desc: "трафик медленнее 20 сек",
         price: 40000,
         icon: "🐢",
+        type: "active",
     },
 ];
 
@@ -108,8 +114,7 @@ function collides(a, b) {
 function saveData() {
     var data = {
         totalCoins: totalCoins,
-        ownedItems: ownedItems,
-        activeItems: activeItems,
+        inventory: inventory,
         highScore: highScore,
     };
     try { localStorage.setItem("nightrace", JSON.stringify(data)); } catch (e) {}
@@ -120,8 +125,7 @@ function loadData() {
         var d = JSON.parse(localStorage.getItem("nightrace"));
         if (d) {
             totalCoins = d.totalCoins || 0;
-            ownedItems = d.ownedItems || [];
-            activeItems = d.activeItems || [];
+            inventory = d.inventory || {};
             highScore = d.highScore || 0;
         }
     } catch (e) {}
@@ -134,8 +138,14 @@ var canvas, ctx, W, H;
 var gameState = "menu";
 var score = 0, distance = 0, gameTime = 0, lastTime = 0;
 var totalCoins = 0, highScore = 0;
-var ownedItems = [];
-var activeItems = [];
+var inventory = {};
+var equippedItems = [];
+var usedThisRace = {};
+
+var shieldActive = false, shieldTimer = 0;
+var magnetActive = false, magnetTimer = 0;
+var slowTrafficActive = false, slowTrafficTimer = 0;
+var doubleCoinsActive = false;
 
 // Дорога
 var roadLeft, roadRight, roadWidth, laneWidth;
@@ -319,61 +329,37 @@ function renderShop() {
     container.innerHTML = "";
 
     SHOP_ITEMS.forEach(function (item) {
-        var owned = ownedItems.indexOf(item.id) !== -1;
-        var active = activeItems.indexOf(item.id) !== -1;
+        var count = inventory[item.id] || 0;
         var canBuy = totalCoins >= item.price;
 
         var div = document.createElement("div");
-        div.className = "shop-item" + (owned ? " owned" : "");
-
-        var btnText, btnDisabled;
-        if (owned && active) {
-            btnText = "ВКЛ";
-            btnDisabled = false;
-        } else if (owned && !active) {
-            btnText = "ВКЛЮЧИТЬ";
-            btnDisabled = false;
-        } else if (canBuy) {
-            btnText = "🪙 " + item.price;
-            btnDisabled = false;
-        } else {
-            btnText = "🪙 " + item.price;
-            btnDisabled = true;
-        }
+        div.className = "shop-item" + (count > 0 ? " owned" : "");
 
         div.innerHTML =
             '<div class="shop-item-icon">' + item.icon + "</div>" +
             '<div class="shop-item-info">' +
-            '<div class="shop-item-name">' + item.name + "</div>" +
-            '<div class="shop-item-desc">' + item.desc + "</div>" +
+                '<div class="shop-item-name">' + item.name +
+                (count > 0 ? ' <span style="color:#00ff88">(x' + count + ')</span>' : '') +
+                "</div>" +
+                '<div class="shop-item-desc">' + item.desc + "</div>" +
             "</div>" +
             '<button class="shop-item-btn" ' +
-            (btnDisabled ? "disabled" : "") + ">" + btnText + "</button>";
+            (!canBuy ? "disabled" : "") + ">🪙 " + item.price + "</button>";
 
         var btn = div.querySelector(".shop-item-btn");
         btn.addEventListener("click", function (e) {
             e.stopPropagation();
-            if (owned) {
-                // Вкл/выкл
-                var idx = activeItems.indexOf(item.id);
-                if (idx !== -1) {
-                    activeItems.splice(idx, 1);
-                } else {
-                    activeItems.push(item.id);
-                }
-            } else if (canBuy) {
+            if (totalCoins >= item.price) {
                 totalCoins -= item.price;
-                ownedItems.push(item.id);
-                activeItems.push(item.id);
+                inventory[item.id] = (inventory[item.id] || 0) + 1;
+                saveData();
+                renderShop();
             }
-            saveData();
-            renderShop();
         });
 
         container.appendChild(div);
     });
 }
-
 
 // ======== ПАУЗА ========
 
@@ -416,8 +402,9 @@ function startGame() {
     playerX = lanes[1]; playerTargetX = lanes[1];
     playerY = H * 0.75; playerSpeed = 3;
     playerLives = 3; playerInvincible = false;
+    playerInvTimer = 0; playerBlinkTimer = 0;
     nitro = 0; nitroActive = false;
-    trafficCars = []; trafficTimer = 0; trafficInterval = 1800;
+    trafficCars = []; trafficTimer = 0; trafficInterval = 2200;
     bonuses = []; bonusTimer = 0;
     billboards = []; billboardTimer = 0;
     weather = "clear"; weatherParticles = []; weatherTimer = 0;
@@ -425,14 +412,33 @@ function startGame() {
     shownScoreMilestones = {}; shownDistMilestones = {};
     lastLaneChangeTime = 0;
 
-    // Применяем покупки
-    if (activeItems.indexOf("extralife") !== -1) playerLives = 4;
-    if (activeItems.indexOf("nitrostart") !== -1) nitro = 100;
-    if (activeItems.indexOf("shield") !== -1) {
-        playerInvincible = true;
-        playerInvTimer = 3;
-        playerBlinkTimer = 0;
+    // Сброс предметов
+    shieldActive = false; shieldTimer = 0;
+    magnetActive = false; magnetTimer = 0;
+    slowTrafficActive = false; slowTrafficTimer = 0;
+    doubleCoinsActive = false;
+    usedThisRace = {};
+
+    // Авто-предметы (используются сразу при старте)
+    if (inventory["extralife"] && inventory["extralife"] > 0) {
+        playerLives = 4;
+        inventory["extralife"]--;
+        showNotif("+1 жизнь", "#ff4466");
     }
+    if (inventory["nitrostart"] && inventory["nitrostart"] > 0) {
+        nitro = 100;
+        inventory["nitrostart"]--;
+        showNotif("нитро заряжено", "#ff00ff");
+    }
+    if (inventory["doublecoins"] && inventory["doublecoins"] > 0) {
+        doubleCoinsActive = true;
+        inventory["doublecoins"]--;
+        showNotif("x2 монеты", "#ffdd00");
+    }
+    saveData();
+
+    // Показать кнопки предметов
+    updateItemButtons();
 
     stars = [];
     for (var i = 0; i < 60; i++) {
@@ -446,7 +452,6 @@ function startGame() {
     lastTime = performance.now();
 }
 
-
 // ======== GAME OVER ========
 
 function gameOver() {
@@ -456,7 +461,7 @@ function gameOver() {
     document.getElementById("pause-btn").classList.remove("visible");
 
     var earned = score;
-    if (activeItems.indexOf("doublecoins") !== -1) earned = score * 2;
+    if (doubleCoinsActive) earned = score * 2;
     totalCoins += earned;
     if (score > highScore) highScore = score;
     saveData();
@@ -512,13 +517,38 @@ function update(dt) {
         playerSpeed = lerp(playerSpeed, 12, 0.05);
         if (nitroTimer <= 0 || nitro <= 0) { nitroActive = false; nitro = Math.max(0, nitro); }
     } else {
-        var ts2 = 3 + gameTime * 0.03;
+        // Скорость растёт как в Subway Surfers
+        var ts2;
+        if (gameTime < 15) {
+            ts2 = 2.5;
+        } else if (gameTime < 40) {
+            ts2 = 3 + (gameTime - 15) * 0.04;
+        } else if (gameTime < 90) {
+            ts2 = 4 + (gameTime - 40) * 0.03;
+        } else if (gameTime < 180) {
+            ts2 = 5.5 + (gameTime - 90) * 0.015;
+        } else {
+            ts2 = 7;
+        }
         playerSpeed = lerp(playerSpeed, Math.min(ts2, 7), 0.01);
     }
 
     if (playerInvincible) {
         playerInvTimer -= dt; playerBlinkTimer += dt;
         if (playerInvTimer <= 0) playerInvincible = false;
+          // Таймеры предметов
+    if (shieldActive) {
+        shieldTimer -= dt;
+        if (shieldTimer <= 0) { shieldActive = false; }
+    }
+    if (magnetActive) {
+        magnetTimer -= dt;
+        if (magnetTimer <= 0) { magnetActive = false; showNotif("магнит закончился", "#888"); }
+    }
+    if (slowTrafficActive) {
+        slowTrafficTimer -= dt;
+        if (slowTrafficTimer <= 0) { slowTrafficActive = false; showNotif("замедление закончилось", "#888"); }
+    }
     }
 
     markingOffset += playerSpeed * dt * 60;
@@ -527,11 +557,24 @@ function update(dt) {
     stars.forEach(function (s) { s.twinkle += s.speed; });
 
     // Трафик
-    trafficInterval = Math.max(600, 1800 - gameTime * 3);
+    // Трафик как в Subway Surfers — сначала медленно, потом быстрее
+    if (gameTime < 10) {
+        trafficInterval = 2500;
+    } else if (gameTime < 30) {
+        trafficInterval = 2000;
+    } else if (gameTime < 60) {
+        trafficInterval = 1500;
+    } else if (gameTime < 120) {
+        trafficInterval = 1000;
+    } else if (gameTime < 180) {
+        trafficInterval = 750;
+    } else {
+        trafficInterval = 550;
+    }
     trafficTimer += dt * 1000;
     if (trafficTimer >= trafficInterval) { trafficTimer = 0; spawnTraffic(); }
 
-    var trafficSpeedMult = activeItems.indexOf("slowtraffic") !== -1 ? 0.5 : 1;
+    var trafficSpeedMult = slowTrafficActive ? 0.4 : 1;
     trafficCars.forEach(function (c) {
         c.y += (playerSpeed - c.speed * trafficSpeedMult) * dt * 60;
     });
@@ -545,7 +588,7 @@ function update(dt) {
         b.bob += dt * 3;
 
         // Магнит
-        if (activeItems.indexOf("magnet") !== -1 && (b.type === "coin" || b.type === "star")) {
+            if (magnetActive && (b.type === "coin" || b.type === "star")) {
             var dx = playerX - b.x;
             var dy = playerY - b.y;
             var dist = Math.sqrt(dx * dx + dy * dy);
@@ -589,7 +632,7 @@ function update(dt) {
     }
 
     // Сбор бонусов
-    var coinMult = activeItems.indexOf("doublecoins") !== -1 ? 2 : 1;
+     var coinMult = doubleCoinsActive ? 2 : 1;
     for (var i = bonuses.length - 1; i >= 0; i--) {
         var b = bonuses[i];
         var bH = { x: b.x - 18, y: b.y - 18, w: 36, h: 36 };
@@ -728,6 +771,66 @@ function updateWeather(dt) {
 // ======== UI ========
 
 function showNotif(text, color) { notification = { text: text, color: color }; notifTimer = 3; }
+
+// ======== КНОПКИ ПРЕДМЕТОВ НА ЭКРАНЕ ========
+
+function updateItemButtons() {
+    var container = document.getElementById("item-buttons");
+    if (!container) return;
+    container.innerHTML = "";
+
+    var items = [
+        { id: "shield", icon: "🛡️", label: "ЩИТ" },
+        { id: "magnet", icon: "🧲", label: "МАГНИТ" },
+        { id: "slowtraffic", icon: "🐢", label: "ЗАМЕДЛ." },
+    ];
+
+    items.forEach(function (item) {
+        var count = inventory[item.id] || 0;
+        if (count <= 0) return;
+        if (usedThisRace[item.id]) return;
+
+        var btn = document.createElement("button");
+        btn.className = "item-btn";
+        btn.innerHTML = item.icon + "<span>" + count + "</span>";
+        btn.addEventListener("click", function () {
+            useItem(item.id);
+        });
+        container.appendChild(btn);
+    });
+}
+
+function useItem(id) {
+    if (usedThisRace[id]) return;
+    if (!inventory[id] || inventory[id] <= 0) return;
+
+    inventory[id]--;
+    usedThisRace[id] = true;
+    saveData();
+
+    if (id === "shield") {
+        shieldActive = true;
+        shieldTimer = 8;
+        playerInvincible = true;
+        playerInvTimer = 8;
+        playerBlinkTimer = 0;
+        playSound("nitro");
+        showNotif("щит активирован! 8 сек", "#00ffff");
+    } else if (id === "magnet") {
+        magnetActive = true;
+        magnetTimer = 15;
+        playSound("collect");
+        showNotif("магнит активирован! 15 сек", "#ffaa00");
+    } else if (id === "slowtraffic") {
+        slowTrafficActive = true;
+        slowTrafficTimer = 20;
+        playSound("collect");
+        showNotif("трафик замедлен! 20 сек", "#44aa00");
+    }
+
+    updateItemButtons();
+}
+
 function addPopup(x, y, text, color) { popups.push({ x: x, y: y, text: text, color: color, alpha: 1 }); }
 
 
